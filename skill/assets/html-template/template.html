@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>旅行方案 - __TRIP_TITLE__</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background:#f8fafc; color:#1e293b; line-height:1.6; }
+.header { background:linear-gradient(135deg,#2563eb,#1d4ed8); color:#fff; padding:20px 24px; }
+.header h1 { font-size:22px; font-weight:700; }
+.header .subtitle { font-size:13px; opacity:.85; margin-top:4px; }
+.tabs { display:flex; background:#fff; border-bottom:1px solid #e2e8f0; overflow-x:auto; position:sticky; top:0; z-index:100; }
+.tab { padding:14px 20px; cursor:pointer; font-size:14px; font-weight:500; color:#64748b; border-bottom:3px solid transparent; white-space:nowrap; transition:all .2s; }
+.tab:hover { color:#2563eb; }
+.tab.active { color:#2563eb; border-bottom-color:#2563eb; }
+.page { display:none; padding:20px; max-width:1100px; margin:0 auto; }
+.page.active { display:block; }
+.card { background:#fff; border-radius:12px; padding:16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+.card h3 { font-size:16px; margin-bottom:8px; color:#0f172a; }
+.card .meta { font-size:13px; color:#64748b; margin-bottom:6px; }
+.tag { display:inline-block; padding:2px 10px; border-radius:20px; font-size:12px; margin-right:6px; margin-bottom:4px; }
+.tag.red { background:#fef2f2; color:#dc2626; }
+.tag.blue { background:#eff6ff; color:#2563eb; }
+.tag.green { background:#ecfdf5; color:#059669; }
+.tag.orange { background:#fff7ed; color:#ea580c; }
+.tag.gray { background:#f1f5f9; color:#64748b; }
+.tag.purple { background:#faf5ff; color:#7c3aed; }
+
+/* 天选择器 */
+.day-filter { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.day-btn { padding:8px 18px; border:1px solid #e2e8f0; border-radius:20px; background:#fff; cursor:pointer; font-size:13px; font-weight:500; transition:all .2s; color:#64748b; }
+.day-btn:hover { border-color:#2563eb; color:#2563eb; }
+.day-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+
+#map { height:480px; border-radius:12px; margin-bottom:16px; z-index:1; }
+.summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+.summary-item { background:#fff; border-radius:10px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+.summary-item .num { font-size:22px; font-weight:700; color:#2563eb; }
+.summary-item .label { font-size:12px; color:#64748b; margin-top:2px; }
+
+/* 图层开关 */
+.layer-ctrl { display:flex; gap:14px; margin-bottom:12px; font-size:13px; color:#475569; flex-wrap:wrap; align-items:center; background:#fff; padding:10px 14px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+.layer-ctrl .title { font-weight:600; color:#64748b; }
+.layer-toggle { display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; }
+.layer-toggle input { width:15px; height:15px; accent-color:#2563eb; cursor:pointer; }
+.layer-toggle .swatch { width:10px; height:10px; border-radius:50%; display:inline-block; }
+
+/* 时间轴 */
+.timeline-day { margin-bottom:28px; }
+.timeline-day .day-header { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.timeline-day .day-badge { background:#2563eb; color:#fff; padding:6px 16px; border-radius:20px; font-size:14px; font-weight:600; }
+.timeline-day .day-date { font-size:13px; color:#64748b; }
+.timeline-day .day-wake { font-size:12px; color:#94a3b8; }
+.timeline { position:relative; padding-left:80px; }
+.timeline::before { content:''; position:absolute; left:60px; top:8px; bottom:8px; width:2px; background:#e2e8f0; }
+.tl-item { position:relative; margin-bottom:14px; }
+.tl-item .tl-time { position:absolute; left:-80px; top:2px; width:60px; text-align:right; font-size:13px; font-weight:600; color:#2563eb; }
+.tl-item .tl-dot { position:absolute; left:-24px; top:6px; width:12px; height:12px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 2px #cbd5e1; z-index:1; }
+.tl-item.type-wakeup .tl-dot { background:#94a3b8; box-shadow:0 0 0 2px #94a3b8; }
+.tl-item.type-breakfast .tl-dot, .tl-item.type-lunch .tl-dot, .tl-item.type-dinner .tl-dot { background:#f59e0b; box-shadow:0 0 0 2px #f59e0b; }
+.tl-item.type-attraction .tl-dot { background:#ef4444; box-shadow:0 0 0 2px #ef4444; }
+.tl-item.type-transport .tl-dot { background:#2563eb; box-shadow:0 0 0 2px #2563eb; }
+.tl-item.type-leisure .tl-dot { background:#10b981; box-shadow:0 0 0 2px #10b981; }
+.tl-card { background:#fff; border-radius:10px; padding:12px 16px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+.tl-card .tl-title { font-size:14px; font-weight:600; color:#0f172a; }
+.tl-card .tl-detail { font-size:12px; color:#64748b; margin-top:3px; }
+.tl-card.type-transport { background:#eff6ff; border-left:3px solid #2563eb; }
+.tl-card.type-breakfast, .tl-card.type-lunch, .tl-card.type-dinner { background:#fffbeb; border-left:3px solid #f59e0b; }
+.tl-card.type-attraction { background:#fef2f2; border-left:3px solid #ef4444; }
+.tl-card.type-leisure { background:#ecfdf5; border-left:3px solid #10b981; }
+.locate-btn { display:inline-block; margin-top:6px; padding:2px 10px; font-size:12px; border:1px solid #cbd5e1; border-radius:14px; color:#2563eb; cursor:pointer; background:#fff; }
+.locate-btn:hover { background:#eff6ff; }
+
+.grid-2 { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+.detail-row { display:flex; justify-content:space-between; padding:4px 0; font-size:13px; border-bottom:1px solid #f1f5f9; }
+.detail-row:last-child { border-bottom:none; }
+.detail-row .k { color:#64748b; }
+.detail-row .v { font-weight:500; }
+.tips { background:#fffbeb; border-left:3px solid #f59e0b; padding:10px 14px; border-radius:0 8px 8px 0; margin-top:8px; font-size:13px; }
+.filter-bar { display:flex; align-items:center; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+.filter-bar label { font-size:13px; color:#64748b; }
+.price-range { display:flex; align-items:center; gap:8px; }
+.price-range input[type=range] { width:140px; }
+.price-range .val { font-size:13px; font-weight:600; color:#2563eb; min-width:60px; }
+.hotel-card { cursor:pointer; transition:transform .15s; }
+.hotel-card:hover { transform:translateY(-2px); }
+.price { font-size:18px; font-weight:700; color:#dc2626; }
+.price .unit { font-size:12px; font-weight:400; }
+.food-filter { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.food-filter button { padding:6px 14px; border:1px solid #e2e8f0; border-radius:20px; background:#fff; cursor:pointer; font-size:13px; transition:all .2s; }
+.food-filter button.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+.packing-category { margin-bottom:16px; }
+.packing-category h4 { font-size:14px; color:#2563eb; margin-bottom:8px; }
+.packing-list { list-style:none; }
+.packing-list li { padding:6px 0; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+.packing-list li::before { content:'☐'; font-size:16px; }
+.packing-list li.checked { text-decoration:line-through; color:#94a3b8; }
+.packing-list li.checked::before { content:'☑'; }
+.empty { text-align:center; padding:40px; color:#94a3b8; font-size:14px; }
+footer { text-align:center; padding:20px; font-size:12px; color:#94a3b8; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🚗 __TRIP_TITLE__</h1>
+  <div class="subtitle">__TRIP_SUBTITLE__</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-page="overview">🗺️ 总览</div>
+  <div class="tab" data-page="itinerary">📅 行程</div>
+  <div class="tab" data-page="attractions">🏛️ 景点</div>
+  <div class="tab" data-page="food">🍜 美食</div>
+  <div class="tab" data-page="hotel">🏨 住宿</div>
+  <div class="tab" data-page="packing">🎒 行李</div>
+</div>
+
+<!-- 总览 -->
+<div class="page active" id="page-overview">
+  <div class="summary-grid" id="summary-grid"></div>
+  <div class="day-filter" id="day-filter-overview"></div>
+  <div class="layer-ctrl" id="layer-ctrl">
+    <span class="title">图层：</span>
+    <label class="layer-toggle"><input type="checkbox" data-layer="attraction" checked><span class="swatch" style="background:#ef4444"></span>景点</label>
+    <label class="layer-toggle"><input type="checkbox" data-layer="food" checked><span class="swatch" style="background:#f59e0b"></span>美食</label>
+    <label class="layer-toggle"><input type="checkbox" data-layer="hotel" checked><span class="swatch" style="background:#10b981"></span>住宿</label>
+    <label class="layer-toggle"><input type="checkbox" data-layer="route" checked><span class="swatch" style="background:#2563eb"></span>路线</label>
+  </div>
+  <div id="map"></div>
+  <div class="card" id="route-overview"></div>
+</div>
+
+<!-- 行程 -->
+<div class="page" id="page-itinerary">
+  <div class="day-filter" id="day-filter-itinerary"></div>
+  <div id="itinerary-content"></div>
+</div>
+
+<!-- 景点 -->
+<div class="page" id="page-attractions">
+  <div class="day-filter" id="day-filter-attractions"></div>
+  <div class="grid-2" id="attractions-content"></div>
+</div>
+
+<!-- 美食 -->
+<div class="page" id="page-food">
+  <div class="day-filter" id="day-filter-food"></div>
+  <div class="food-filter" id="food-filter"></div>
+  <div class="grid-2" id="food-content"></div>
+</div>
+
+<!-- 住宿 -->
+<div class="page" id="page-hotel">
+  <div class="filter-bar">
+    <div class="price-range">
+      <label>价格区间：</label>
+      <input type="range" id="price-min" min="0" max="2000" value="0">
+      <span class="val" id="price-min-val">¥0</span>
+      <span>—</span>
+      <input type="range" id="price-max" min="0" max="2000" value="2000">
+      <span class="val" id="price-max-val">¥2000</span>
+    </div>
+    <span id="hotel-count" style="font-size:13px;color:#64748b"></span>
+  </div>
+  <div class="grid-2" id="hotel-content"></div>
+</div>
+
+<!-- 行李 -->
+<div class="page" id="page-packing">
+  <div id="packing-content"></div>
+</div>
+
+<footer>本方案价格与班次为参考信息，请以实际预订为准。美食推荐来自小红书/抖音真实用户分享。</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+window.TRIP_DATA = __TRIP_DATA__;
+const D = window.TRIP_DATA;
+let currentDay = 'all'; // 'all' 或 1,2,3...
+let map;
+let layers = {};        // attraction / food / hotel / route -> L.layerGroup
+let layerOn = { attraction: true, food: true, hotel: true, route: true };
+let lastMarkers = [];   // 供 fitBounds 使用
+
+/* ============ GCJ-02 -> WGS-84 坐标转换 ============
+   高德返回的坐标为 GCJ-02（火星坐标），直接放到 OpenStreetMap(WGS-84) 上会偏移约 500m。
+   若数据本身就是 WGS-84，可在 JSON 顶层声明 "coords": "wgs84" 跳过转换。 */
+const COORD_SYS = (D.coords || 'gcj02').toLowerCase();
+function transformLat(lng, lat) {
+  let ret = -100.0 + 2.0 * lng + 3.0 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng));
+  ret += (20.0 * Math.sin(6.0 * lng * Math.PI) + 20.0 * Math.sin(2.0 * lng * Math.PI)) * 2.0 / 3.0;
+  ret += (20.0 * Math.sin(lat * Math.PI) + 40.0 * Math.sin(lat / 3.0 * Math.PI)) * 2.0 / 3.0;
+  ret += (160.0 * Math.sin(lat / 12.0 * Math.PI) + 320 * Math.sin(lat * Math.PI / 30.0)) * 2.0 / 3.0;
+  return ret;
+}
+function transformLng(lng, lat) {
+  let ret = 300.0 + lng + 2.0 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng));
+  ret += (20.0 * Math.sin(6.0 * lng * Math.PI) + 20.0 * Math.sin(2.0 * lng * Math.PI)) * 2.0 / 3.0;
+  ret += (20.0 * Math.sin(lng * Math.PI) + 40.0 * Math.sin(lng / 3.0 * Math.PI)) * 2.0 / 3.0;
+  ret += (150.0 * Math.sin(lng / 12.0 * Math.PI) + 300.0 * Math.sin(lng / 30.0 * Math.PI)) * 2.0 / 3.0;
+  return ret;
+}
+function gcj2wgs(lat, lng) {
+  const a = 6378245.0, ee = 0.00669342162296594323;
+  if (lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271) return [lat, lng]; // 境外直接返回
+  let dLat = transformLat(lng - 105.0, lat - 35.0);
+  let dLng = transformLng(lng - 105.0, lat - 35.0);
+  const radLat = lat / 180.0 * Math.PI;
+  let magic = Math.sin(radLat);
+  magic = 1 - ee * magic * magic;
+  const sqrtMagic = Math.sqrt(magic);
+  dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * Math.PI);
+  dLng = (dLng * 180.0) / (a / sqrtMagic * Math.cos(radLat) * Math.PI);
+  return [lat - dLat, lng - dLng];
+}
+function cv(lat, lng) {
+  if (lat === undefined || lat === null || lng === undefined || lng === null) return null;
+  return COORD_SYS === 'wgs84' ? [lat, lng] : gcj2wgs(lat, lng);
+}
+
+// Tab 切换
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('page-' + tab.dataset.page).classList.add('active');
+    if (tab.dataset.page === 'overview' && map) {
+      setTimeout(() => map.invalidateSize(), 100);
+    }
+  });
+});
+
+// 天选择器
+function buildDayFilter(containerId, onChange) {
+  const days = D.daily_plan || [];
+  let html = '<button class="day-btn active" data-day="all">全部</button>';
+  days.forEach(d => {
+    html += `<button class="day-btn" data-day="${d.day}">Day ${d.day}${d.date ? ' · ' + d.date : ''}</button>`;
+  });
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = html;
+  el.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const day = btn.dataset.day;
+      // 所有页面的天选择器保持同步
+      currentDay = day === 'all' ? 'all' : parseInt(day);
+      document.querySelectorAll('.day-filter').forEach(df => {
+        df.querySelectorAll('.day-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.day === day);
+        });
+      });
+      if (onChange) onChange();
+    });
+  });
+}
+
+function matchDay(itemDay) {
+  if (currentDay === 'all') return true;
+  if (itemDay === undefined || itemDay === null) return true; // 未标注天的默认显示
+  if (Array.isArray(itemDay)) return itemDay.includes(currentDay);
+  return itemDay === currentDay;
+}
+
+// 概要
+function renderSummary() {
+  const totalDays = D.days;
+  const totalCities = (D.cities || []).length;
+  const totalAttr = (D.cities || []).reduce((s, c) => s + (c.attractions || []).length, 0);
+  const totalFood = (D.foods || []).length;
+  const totalHotel = (D.accommodations || []).length;
+  const driveKm = (D.intercity_routes || []).reduce((s, r) => s + (r.distance_km || 0), 0);
+  const items = [
+    { num: totalDays + '天', label: '总天数' },
+    { num: totalCities, label: '途经城市' },
+    { num: totalAttr, label: '景点' },
+    { num: totalFood, label: '美食推荐' },
+    { num: totalHotel, label: '住宿选项' },
+    { num: driveKm + 'km', label: '总驾驶里程' }
+  ];
+  document.getElementById('summary-grid').innerHTML = items.map(i =>
+    `<div class="summary-item"><div class="num">${i.num}</div><div class="label">${i.label}</div></div>`
+  ).join('');
+}
+
+// ============ 地图 ============
+function initMap() {
+  map = L.map('map').setView([30, 118], 7);
+  ['attraction', 'food', 'hotel', 'route'].forEach(k => { layers[k] = L.layerGroup().addTo(map); });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 18
+  }).addTo(map);
+
+  // 图层开关
+  document.querySelectorAll('#layer-ctrl input[data-layer]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      layerOn[cb.dataset.layer] = cb.checked;
+      renderMap(false); // 图层开关不重置视野，保持当前缩放位置
+    });
+  });
+  renderMap(true);
+}
+
+function markerIcon(type, order) {
+  const colors = { attraction: '#ef4444', food: '#f59e0b', hotel: '#10b981' };
+  const c = colors[type];
+  const inner = order
+    ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(45deg);color:#fff;font-size:11px;font-weight:700">${order}</div>`
+    : '';
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="position:relative;background:${c};width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">${inner}</div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 24]
+  });
+}
+
+// 当选择具体某天时，按当天行程顺序为带坐标的景点/美食编号
+function dayOrderMap() {
+  const om = new Map(); // key: type|name -> order
+  if (currentDay === 'all') return om;
+  const d = (D.daily_plan || []).find(x => x.day === currentDay);
+  if (!d) return om;
+  let n = 0;
+  (d.schedule || []).forEach(item => {
+    if (item.lat && item.lng && (item.type === 'attraction' || item.type === 'lunch' || item.type === 'dinner')) {
+      n++;
+      om.set(item.type + '|' + item.title, n);
+    }
+  });
+  return om;
+}
+
+function renderMap(doFit) {
+  if (!map) return;
+  Object.values(layers).forEach(l => l.clearLayers());
+  lastMarkers = [];
+  const om = dayOrderMap();
+
+  function addMarker(lat, lng, title, type, popup, order) {
+    const pos = cv(lat, lng);
+    if (!pos) return;
+    const m = L.marker(pos, { icon: markerIcon(type, order), zIndexOffset: order ? 500 : 0 });
+    const prefix = order ? `<b>第${order}站 · ${title}</b>` : `<b>${title}</b>`;
+    m.bindPopup(`${prefix}<br>${popup || ''}`);
+    layers[type].addLayer(m);
+    lastMarkers.push({ marker: m, layer: type, pos });
+  }
+
+  if (layerOn.attraction) {
+    (D.cities || []).forEach(city => {
+      (city.attractions || []).forEach(a => {
+        if (matchDay(a.day)) {
+          const order = om.get('attraction|' + a.name);
+          addMarker(a.lat, a.lng, a.name, 'attraction', `${a.duration_hours || ''}小时 · ${a.ticket || '未知门票'}`, order);
+        }
+      });
+    });
+  }
+  if (layerOn.food) {
+    (D.foods || []).forEach(f => {
+      if (matchDay(f.day)) {
+        const order = om.get('dinner|' + f.name) || om.get('lunch|' + f.name);
+        addMarker(f.lat, f.lng, f.name, 'food', `${f.type || ''} · 人均¥${f.price_per_person || '?'}`, order);
+      }
+    });
+  }
+  if (layerOn.hotel) {
+    (D.accommodations || []).forEach(h => {
+      if (matchDay(h.day)) addMarker(h.lat, h.lng, h.name, 'hotel', `¥${h.price_min}-${h.price_max}/晚`);
+    });
+  }
+
+  // 自适应视野到可见图层（仅初始化/切换天时执行；图层开关不触发，避免缩放被重置）
+  if (doFit) {
+    const visible = lastMarkers.filter(x => layerOn[x.layer]);
+    const fitTargets = visible.map(x => x.pos);
+    // 路线也要纳入视野
+    if (layerOn.route) {
+      (D.intercity_routes || []).forEach(r => {
+        if (!matchDay(r.day)) return;
+        (r.polyline || []).forEach(p => { const c = cv(p[0], p[1]); if (c) fitTargets.push(c); });
+      });
+    }
+    if (fitTargets.length > 1) {
+      map.fitBounds(L.latLngBounds(fitTargets).pad(0.12));
+    } else if (fitTargets.length === 1) {
+      map.setView(fitTargets[0], 13);
+    }
+  }
+  if (layerOn.route) drawRoutes(om);
+}
+
+// ============ 路线绘制 ============
+function convPolyline(pts) { return (pts || []).map(p => cv(p[0], p[1])).filter(Boolean); }
+
+function drawRoutes(om) {
+  // 1) 城际路线（真实几何 polyline，缺失时退化为起终点虚线）
+  (D.intercity_routes || []).forEach(r => {
+    if (!matchDay(r.day)) return;
+    const pts = convPolyline(r.polyline);
+    const isDrive = (r.mode || '').indexOf('驾') >= 0;
+    if (pts.length > 1) {
+      layers.route.addLayer(L.polyline(pts, isDrive
+        ? { color: '#2563eb', weight: 5, opacity: 0.75 }
+        : { color: '#7c3aed', weight: 4, opacity: 0.75, dashArray: '10,8' }));
+    } else if (r.from_lat && r.to_lat) {
+      const a = cv(r.from_lat, r.from_lng), b = cv(r.to_lat, r.to_lng);
+      if (a && b) layers.route.addLayer(L.polyline([a, b], { color: '#2563eb', weight: 4, opacity: 0.6, dashArray: '10,8' }));
+    }
+    // 起终点标注
+    [[r.from_lat, r.from_lng, '📍 ' + r.from], [r.to_lat, r.to_lng, '🏁 ' + r.to]].forEach(([la, ln, label]) => {
+      const p = cv(la, ln);
+      if (p) layers.route.addLayer(L.circleMarker(p, {
+        radius: 6, color: '#fff', weight: 2, fillColor: '#1d4ed8', fillOpacity: 1
+      }).bindPopup(`<b>${label}</b><br>${r.mode} · ${r.distance_km || '-'}km · ${r.duration_hours || '-'}h`));
+    });
+  });
+
+  // 2) 选中某天时：绘制当天完整路线（按行程顺序）
+  if (currentDay === 'all') return;
+  const d = (D.daily_plan || []).find(x => x.day === currentDay);
+  if (!d) return;
+
+  const legs = d.route || [];
+  if (legs.length) {
+    // 精细模式：每天每段都有真实路线 polyline
+    legs.forEach(leg => {
+      const pts = convPolyline(leg.polyline);
+      if (pts.length > 1) {
+        layers.route.addLayer(L.polyline(pts, { color: '#ef4444', weight: 4, opacity: 0.7 }));
+      }
+    });
+  } else {
+    // 退化模式：按 schedule 顺序将带坐标的点连成虚线
+    const seq = [];
+    (d.schedule || []).forEach(item => {
+      let la = item.lat, ln = item.lng;
+      if ((la === undefined || la === null) && item.title) {
+        // 从景点库补坐标
+        (D.cities || []).forEach(c => (c.attractions || []).forEach(a => { if (a.name === item.title) { la = a.lat; ln = a.lng; } }));
+      }
+      if (la && ln && seq.length && seq[seq.length - 1][0] === la && seq[seq.length - 1][1] === ln) return;
+      if (la && ln) seq.push([la, ln]);
+    });
+    const pts = seq.map(p => cv(p[0], p[1])).filter(Boolean);
+    if (pts.length > 1) {
+      layers.route.addLayer(L.polyline(pts, { color: '#ef4444', weight: 4, opacity: 0.7, dashArray: '8,6' }));
+    }
+  }
+}
+
+// 路线总览（文字）
+function renderRouteOverview() {
+  const routes = D.intercity_routes || [];
+  if (!routes.length) { document.getElementById('route-overview').innerHTML = '<p style="color:#94a3b8">暂无城际路线数据</p>'; return; }
+  let html = '<h3>🛣️ 城际路线</h3>';
+  routes.forEach(r => {
+    const dayTag = r.day ? (Array.isArray(r.day) ? r.day.map(x => 'Day ' + x).join('/') : 'Day ' + r.day) + ' · ' : '';
+    html += `<div class="detail-row"><span class="k">${dayTag}${r.from} → ${r.to}</span><span class="v">${r.mode} · ${r.distance_km || '-'}km · ${r.duration_hours || '-'}h</span></div>`;
+    if (r.note) html += `<div class="tips">${r.note}</div>`;
+  });
+  html += '<div class="meta" style="margin-top:6px">💡 选择上方某一天，地图会显示当天按游览顺序编号的完整路线</div>';
+  document.getElementById('route-overview').innerHTML = html;
+}
+
+// 行程时间轴
+function renderItinerary() {
+  const days = D.daily_plan || [];
+  const filtered = currentDay === 'all' ? days : days.filter(d => d.day === currentDay);
+  if (!filtered.length) { document.getElementById('itinerary-content').innerHTML = '<div class="empty">暂无行程数据</div>'; return; }
+
+  let html = '';
+  filtered.forEach(d => {
+    html += `<div class="timeline-day">`;
+    html += `<div class="day-header"><span class="day-badge">Day ${d.day}</span>`;
+    if (d.date) html += `<span class="day-date">${d.date}</span>`;
+    if (d.wake_up) html += `<span class="day-wake">起床 ${d.wake_up}</span>`;
+    html += `</div>`;
+    html += `<div class="timeline">`;
+    (d.schedule || []).forEach(item => {
+      const type = item.type || 'leisure';
+      html += `<div class="tl-item type-${type}">`;
+      html += `<div class="tl-time">${item.time || ''}</div>`;
+      html += `<div class="tl-dot"></div>`;
+      html += `<div class="tl-card type-${type}">`;
+      html += `<div class="tl-title">${item.title || ''}</div>`;
+      let detail = '';
+      if (item.duration_min) detail += `约${item.duration_min}分钟`;
+      if (item.duration_hours) detail += `约${item.duration_hours}小时`;
+      if (item.mode) detail += ` · ${item.mode}`;
+      if (item.location) detail += ` · ${item.location}`;
+      if (detail) html += `<div class="tl-detail">${detail}</div>`;
+      if (item.lat && item.lng) {
+        html += `<span class="locate-btn" data-lat="${item.lat}" data-lng="${item.lng}" data-title="${item.title || ''}">📍 在地图上查看</span>`;
+      }
+      html += `</div></div>`;
+    });
+    html += `</div></div>`;
+  });
+  document.getElementById('itinerary-content').innerHTML = html;
+
+  // 点击"在地图上查看" -> 跳到总览页并定位
+  document.querySelectorAll('.locate-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelector('.tab[data-page="overview"]').click();
+      setTimeout(() => {
+        const pos = cv(parseFloat(btn.dataset.lat), parseFloat(btn.dataset.lng));
+        if (pos && map) {
+          map.invalidateSize();
+          setTimeout(() => {
+            map.setView(pos, 14);
+            L.popup().setLatLng(pos).setContent(`<b>${btn.dataset.title}</b>`).openOn(map);
+          }, 150);
+        }
+      }, 150);
+    });
+  });
+}
+
+// 景点
+function renderAttractions() {
+  const cities = D.cities || [];
+  let html = '';
+  cities.forEach(city => {
+    (city.attractions || []).forEach(a => {
+      if (!matchDay(a.day)) return;
+      html += `<div class="card"><h3>${a.name}`;
+      if (a.day) html += ` <span class="tag blue">Day ${a.day}</span>`;
+      html += ` <span class="tag gray">${city.name}</span></h3>`;
+      html += `<div class="detail-row"><span class="k">建议游玩</span><span class="v">${a.duration_hours || '-'}小时</span></div>`;
+      html += `<div class="detail-row"><span class="k">门票</span><span class="v">${a.ticket || '未知'}</span></div>`;
+      html += `<div class="detail-row"><span class="k">开放时间</span><span class="v">${a.open_time || '未知'}</span></div>`;
+      html += `<div class="detail-row"><span class="k">地址</span><span class="v">${a.address || '-'}</span></div>`;
+      if (a.weather) html += `<div class="detail-row"><span class="k">天气</span><span class="v">${a.weather}</span></div>`;
+      if (a.tips) html += `<div class="tips">💡 ${a.tips}</div>`;
+      html += `</div>`;
+    });
+  });
+  document.getElementById('attractions-content').innerHTML = html || '<div class="empty">该天暂无景点安排</div>';
+}
+
+// 美食
+function renderFood() {
+  const foods = (D.foods || []).filter(f => matchDay(f.day));
+  const types = [...new Set(foods.map(f => f.type).filter(Boolean))];
+  let filterHtml = '<button class="active" data-type="all">全部</button>';
+  types.forEach(t => filterHtml += `<button data-type="${t}">${t}</button>`);
+  document.getElementById('food-filter').innerHTML = filterHtml;
+
+  function renderList(filter) {
+    const list = filter === 'all' ? foods : foods.filter(f => f.type === filter);
+    let html = '';
+    list.forEach(f => {
+      html += `<div class="card"><h3>${f.name}`;
+      if (f.day) html += ` <span class="tag orange">Day ${f.day}</span>`;
+      html += `</h3>`;
+      html += `<div class="meta"><span class="tag orange">${f.type || '-'}</span>`;
+      if (f.heat) html += `<span class="tag red">${f.heat}热度</span>`;
+      if (f.source) html += `<span class="tag gray">${f.source}</span>`;
+      html += `</div>`;
+      if (f.must_try) html += `<div class="detail-row"><span class="k">必点</span><span class="v">${f.must_try.join('、')}</span></div>`;
+      html += `<div class="detail-row"><span class="k">人均</span><span class="v">¥${f.price_per_person || '-'}</span></div>`;
+      html += `<div class="detail-row"><span class="k">地址</span><span class="v">${f.address || '-'}</span></div>`;
+      if (f.hours) html += `<div class="detail-row"><span class="k">营业时间</span><span class="v">${f.hours}</span></div>`;
+      if (f.note) html += `<div class="tips">${f.note}</div>`;
+      html += `</div>`;
+    });
+    document.getElementById('food-content').innerHTML = html || '<div class="empty">该天暂无美食推荐</div>';
+  }
+  renderList('all');
+  document.querySelectorAll('#food-filter button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#food-filter button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderList(btn.dataset.type);
+    });
+  });
+}
+
+// 住宿
+function renderHotel() {
+  const hotels = D.accommodations || [];
+  if (!hotels.length) { document.getElementById('hotel-content').innerHTML = '<div class="empty">暂无住宿数据</div>'; return; }
+  const minP = Math.min(...hotels.map(h => h.price_min || 0));
+  const maxP = Math.max(...hotels.map(h => h.price_max || 1000));
+  const minSlider = document.getElementById('price-min');
+  const maxSlider = document.getElementById('price-max');
+  minSlider.min = minP; minSlider.max = maxP; minSlider.value = minP;
+  maxSlider.min = minP; maxSlider.max = maxP; maxSlider.value = maxP;
+  document.getElementById('price-min-val').textContent = '¥' + minP;
+  document.getElementById('price-max-val').textContent = '¥' + maxP;
+
+  function render() {
+    const lo = +minSlider.value, hi = +maxSlider.value;
+    const list = hotels.filter(h => (h.price_min || 0) <= hi && (h.price_max || 9999) >= lo);
+    document.getElementById('hotel-count').textContent = `共 ${list.length} 家`;
+    let html = '';
+    list.forEach(h => {
+      html += `<div class="card hotel-card"><h3>${h.name}`;
+      if (h.day) html += ` <span class="tag green">Day ${h.day}入住</span>`;
+      html += `</h3>`;
+      html += `<div class="meta">📍 ${h.area || ''} ${h.near ? '· ' + h.near : ''}</div>`;
+      if (h.tags) h.tags.forEach(t => html += `<span class="tag green">${t}</span>`);
+      html += `<div style="margin-top:8px"><span class="price">¥${h.price_min}-${h.price_max}</span><span class="unit">/晚</span>`;
+      if (h.rating) html += ` <span style="font-size:13px;color:#f59e0b;margin-left:8px">⭐ ${h.rating}</span>`;
+      html += `</div>`;
+      if (h.note) html += `<div class="tips">${h.note}</div>`;
+      html += `</div>`;
+    });
+    document.getElementById('hotel-content').innerHTML = html || '<div class="empty">该价格区间暂无匹配酒店</div>';
+  }
+  minSlider.addEventListener('input', () => {
+    if (+minSlider.value > +maxSlider.value) minSlider.value = maxSlider.value;
+    document.getElementById('price-min-val').textContent = '¥' + minSlider.value;
+    render();
+  });
+  maxSlider.addEventListener('input', () => {
+    if (+maxSlider.value < +minSlider.value) maxSlider.value = minSlider.value;
+    document.getElementById('price-max-val').textContent = '¥' + maxSlider.value;
+    render();
+  });
+  render();
+}
+
+// 行李
+function renderPacking() {
+  const p = D.packing || {};
+  const cats = [
+    { key: 'essential', name: '📄 证件与通用必带' },
+    { key: 'driving', name: '🚗 自驾专属' },
+    { key: 'destination_specific', name: '🎯 目的地专属' },
+    { key: 'weather_note', name: '🌤️ 天气提醒', isNote: true }
+  ];
+  let html = '';
+  cats.forEach(cat => {
+    const items = p[cat.key];
+    if (!items || (Array.isArray(items) && !items.length)) return;
+    html += `<div class="packing-category"><h4>${cat.name}</h4>`;
+    if (cat.isNote) {
+      html += `<div class="tips">${items}</div>`;
+    } else {
+      html += '<ul class="packing-list">';
+      items.forEach(i => html += `<li>${i}</li>`);
+      html += '</ul>';
+    }
+    html += '</div>';
+  });
+  document.getElementById('packing-content').innerHTML = html || '<div class="empty">暂无行李清单</div>';
+  document.querySelectorAll('.packing-list li').forEach(li => {
+    li.addEventListener('click', () => li.classList.toggle('checked'));
+  });
+}
+
+// 全局天筛选联动
+function onDayChange() {
+  renderMap(true); // 切换天时重新自适应视野
+  renderItinerary();
+  renderAttractions();
+  renderFood();
+}
+
+// 初始化
+renderSummary();
+initMap();
+renderRouteOverview();
+renderItinerary();
+renderAttractions();
+renderFood();
+renderHotel();
+renderPacking();
+
+// 构建各页天选择器（联动）
+['day-filter-overview', 'day-filter-itinerary', 'day-filter-attractions', 'day-filter-food'].forEach(id => {
+  buildDayFilter(id, onDayChange);
+});
+</script>
+</body>
+</html>
