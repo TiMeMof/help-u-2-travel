@@ -81,6 +81,33 @@ def validate(data):
                 warns.append(f"Day {d.get('day')} 行程项「{it.get('title')}」未带 lat/lng，"
                              f"按天路线串联时会尝试按名称匹配景点库（建议直接写入坐标）")
 
+    # 5. 字段名与模板不匹配的常见错误检测
+    # 5a. 顶层 days 必须存在且为数字
+    if data.get("days") is None:
+        warns.append("顶层缺少 days 字段（数字），总览页将显示'undefined天'。"
+                     "注意：days 必须是顶层字段，不能嵌套在 trip_info 内")
+
+    # 5b. 住宿必须用 price_min/price_max（数字），不能用 price_range（字符串）
+    for h in data.get("accommodations", []) or []:
+        if h.get("price_min") is None and h.get("price_range") is not None:
+            warns.append(f"住宿「{h.get('name')}」用了 price_range（字符串），"
+                         f"模板需要 price_min + price_max（两个数字），否则价格显示 undefined")
+        if h.get("price_min") is not None and not isinstance(h.get("price_min"), (int, float)):
+            warns.append(f"住宿「{h.get('name')}」的 price_min 不是数字类型: {type(h.get('price_min')).__name__}")
+
+    # 5c. 美食必须用 price_per_person（数字），不能用 price（字符串）
+    for f in data.get("foods", []) or []:
+        if f.get("price_per_person") is None and f.get("price") is not None:
+            warns.append(f"美食「{f.get('name')}」用了 price（字符串），"
+                         f"模板需要 price_per_person（数字），否则人均显示 undefined")
+
+    # 5d. 景点必须用 duration_hours（数字），不能用 duration（字符串）
+    for c in data.get("cities", []) or []:
+        for a in c.get("attractions", []) or []:
+            if a.get("duration_hours") is None and a.get("duration") is not None:
+                warns.append(f"景点「{a.get('name')}」用了 duration（字符串），"
+                             f"模板需要 duration_hours（数字），否则建议游玩时长显示 undefined")
+
     return warns
 
 

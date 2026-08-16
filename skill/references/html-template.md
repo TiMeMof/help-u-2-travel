@@ -22,6 +22,17 @@
 
 模板中预留 `window.TRIP_DATA = {};`，生成脚本将完整 JSON 注入此处。所有页面从该对象读取数据渲染。
 
+**⚠ 字段名必须与模板 JS 一致**，否则页面会显示 undefined。完整字段规范见 SKILL.md 的「Step 8: JSON 数据结构规范」。以下是模板 JS 实际读取的关键字段速查：
+
+| 数据区 | 模板读取的字段 | 常见错误 |
+|--------|---------------|----------|
+| 顶层 | `D.days`（数字）、`D.title`、`D.subtitle`、`D.coords` | ❌ `days` 放进 `trip_info` → 总天数 undefined |
+| 景点 | `a.name`、`a.lat`、`a.lng`、`a.day`、`a.duration_hours`（数字）、`a.ticket`、`a.address`、`a.tips` | ❌ `duration`（字符串）→ 建议游玩 undefined |
+| 美食 | `f.name`、`f.lat`、`f.lng`、`f.day`、`f.type`、`f.price_per_person`（数字）、`f.must_try`（数组）、`f.address`、`f.source`、`f.note` | ❌ `price`（字符串）→ 人均 undefined；`signature` → 不渲染 |
+| 住宿 | `h.name`、`h.lat`、`h.lng`、`h.day`、`h.price_min`（数字）、`h.price_max`（数字）、`h.rating`、`h.area`、`h.near`、`h.tags`（数组）、`h.note` | ❌ `price_range`（字符串）→ 价格 undefined；`address` → 位置不显示 |
+| 路线 | `r.from`、`r.to`、`r.mode`、`r.day`、`r.distance_km`、`r.duration_hours`、`r.polyline`（数组） | ❌ 缺 `polyline` → 只画两点直线 |
+| 时间轴 | `s.time`、`s.type`、`s.title`、`s.duration_min`、`s.duration_hours`、`s.ref`、`s.lat`、`s.lng` | ❌ `attraction`/`lunch`/`dinner` 项缺 `lat`/`lng` → 按天路线串联失败 |
+
 ## 地图要求
 
 - 标记所有景点、住宿、美食点位（不同图标/颜色区分）。

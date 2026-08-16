@@ -136,6 +136,127 @@ description: 旅行规划助手，生成交互式 HTML 旅行方案。支持自�
    - **按天路线**：选中某天时，地图按当天行程顺序给景点/餐厅编号（第N站）并连线。
 4. 用 `present_files` 交付 HTML 文件。
 
+### Step 8: JSON 数据结构规范（必须严格遵守字段名）
+
+模板 JS 直接按字段名读取数据，**字段名写错会导致页面显示 undefined**。以下是模板实际使用的全部字段，生成 JSON 时必须严格匹配。
+
+#### 顶层字段
+
+```json
+{
+  "title": "旅行方案标题",
+  "subtitle": "副标题",
+  "coords": "gcj02",
+  "days": 4,                        // ← 顶层数字，不要放进 trip_info
+  "cities": [...],                   // 景点（按城市分组）
+  "foods": [...],                    // 美食
+  "accommodations": [...],           // 住宿
+  "intercity_routes": [...],         // 城际路线
+  "daily_plan": [...],              // 每日时间轴
+  "packing": {...},                  // 行李清单
+  "weather": {...}                   // 天气
+}
+```
+
+> **⚠ 常见错误**：把 `days` 放进 `trip_info.days` 会导致总览页显示"undefined天"。`days` 必须是顶层独立字段。
+
+#### cities[].attractions[] 字段
+
+| 字段 | 类型 | 模板用途 | 说明 |
+|------|------|----------|------|
+| `id` | string | 引用 | 如 "attr_1"，schedule 中 ref 指向此值 |
+| `name` | string | 标题 | 景点名称 |
+| `lat` | number | 地图标记 | 纬度（来自高德 POI） |
+| `lng` | number | 地图标记 | 经度（来自高德 POI） |
+| `day` | number | 按天筛选 | 第几天（整数） |
+| `duration_hours` | number | "建议游玩 X小时" | **数字**，如 5 表示5小时。不要写字符串"5小时" |
+| `ticket` | string | "门票"行 | 票价信息，如 "门票+游船 195元/人" |
+| `address` | string | "地址"行 | 详细地址 |
+| `tips` | string | "💡"提示行 | 游玩贴士 |
+| `rating` | string | 评分 | 如 "4.5" |
+
+#### foods[] 字段
+
+| 字段 | 类型 | 模板用途 | 说明 |
+|------|------|----------|------|
+| `id` | string | 引用 | 如 "food_1" |
+| `name` | string | 标题 | 餐厅名称 |
+| `lat` | number | 地图标记 | 纬度 |
+| `lng` | number | 地图标记 | 经度 |
+| `day` | number | 按天筛选 | 第几天 |
+| `type` | string | 分类标签+筛选 | 如 "鱼头汤/湖鲜" |
+| `price_per_person` | number | "人均 ¥X" | **数字**，如 80。不要写字符串"人均80-100元" |
+| `must_try` | array | 招牌菜 | 如 ["砂锅鱼头", "剁椒鱼头"] |
+| `address` | string | "地址"行 | 详细地址 |
+| `hours` | string | "营业时间"行 | 如 "10:00-22:00"（可选） |
+| `source` | string | 来源标签 | 如 "小红书" / "大众点评" |
+| `note` | string | 提示行 | 排队/订座等提示（可选） |
+
+> **⚠ 常见错误**：用 `price`（字符串"人均80元"）代替 `price_per_person`（数字 80）；用 `signature` 代替 `must_try`；用 `tips` 代替 `note`。
+
+#### accommodations[] 字段
+
+| 字段 | 类型 | 模板用途 | 说明 |
+|------|------|----------|------|
+| `id` | string | 引用 | 如 "hotel_1" |
+| `name` | string | 标题 | 酒店名称 |
+| `lat` | number | 地图标记 | 纬度 |
+| `lng` | number | 地图标记 | 经度 |
+| `day` | string/number | "Day X入住"标签 | 如 "1-3" 或 1 |
+| `price_min` | number | 价格滑块+显示 | **数字**，如 350。不要写 `price_range` 字符串 |
+| `price_max` | number | 价格滑块+显示 | **数字**，如 450 |
+| `rating` | string | 评分 | 如 "4.5" |
+| `type` | string | 类型标签 | 如 "商务酒店" |
+| `area` | string | "📍"位置行 | 区域/地址 |
+| `near` | string | "📍"位置行 | 附近地标（可选） |
+| `tags` | array | 标签 | 如 ["含早", "停车场"]（可选） |
+| `note` | string | 提示行 | 特色/注意事项 |
+
+> **⚠ 常见错误**：用 `price_range`（字符串"350-450元"）代替 `price_min`+`price_max`（两个数字）；用 `address` 代替 `area`；用 `features`/`tips` 代替 `note`。
+
+#### intercity_routes[] 字段
+
+| 字段 | 类型 | 模板用途 | 说明 |
+|------|------|----------|------|
+| `from` | string | 路线标签 | 出发地 |
+| `to` | string | 路线标签 | 目的地 |
+| `mode` | string | 路线标签 | "自驾"/"高铁"等 |
+| `day` | number | 按天筛选 | 第几天 |
+| `distance_km` | number | 路线信息 | 公里数 |
+| `duration_hours` | number | 路线信息 | 小时数 |
+| `from_lat`/`from_lng` | number | 路线起点 | 经纬度 |
+| `to_lat`/`to_lng` | number | 路线终点 | 经纬度 |
+| `polyline` | array | **地图路线绘制** | `[[lat,lng],...]` 完整坐标点数组，来自高德 driving steps |
+| `waypoints` | string | 路线信息 | 途经点描述（可选） |
+| `charging_note` | string | 路线信息 | 充电桩提示（可选） |
+
+#### daily_plan[] 字段
+
+| 字段 | 类型 | 模板用途 | 说明 |
+|------|------|----------|------|
+| `day` | number | 日期标签 | 第几天 |
+| `date` | string | 日期标签 | 如 "2026-08-17" |
+| `wake_up` | string | 起床时间 | 如 "7:00" |
+| `title` | string | 当日标题 | 如 "中心湖区 · 天屿山日落" |
+| `summary` | string | 当日摘要 | 一句话概述 |
+| `schedule` | array | 时间轴 | 见下 |
+
+#### schedule[] 项字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `time` | string | 开始时间，如 "8:00"（必须递进，不能倒流） |
+| `type` | string | "wakeup"/"breakfast"/"transport"/"attraction"/"lunch"/"dinner"/"hotel"/"leisure" |
+| `title` | string | 显示标题 |
+| `duration_min` | number | 持续分钟数（transport/lunch/dinner/leisure 用） |
+| `duration_hours` | number | 持续小时数（attraction 用） |
+| `mode` | string | 交通方式（transport 用），如 "自驾" |
+| `distance_km` | number | 驾驶距离（transport 用，可选） |
+| `ref` | string | 引用景点/美食的 id（attraction/lunch/dinner 用） |
+| `lat`/`lng` | number | 坐标（attraction/lunch/dinner 必须带，用于地图按天路线串联） |
+| `location` | string | 地点描述（breakfast/lunch 用，可选） |
+| `note` | string | 备注（可选） |
+
 ## 关键约束
 
 - **交通方式可扩展**：城际和城内交通都抽象为"方式+耗时+备注"，不要硬编码为自驾。
